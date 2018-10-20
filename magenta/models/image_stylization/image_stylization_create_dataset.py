@@ -30,8 +30,8 @@ import os
 import scipy
 import tensorflow as tf
 
-from magenta.models.image_stylization import image_utils
-from magenta.models.image_stylization import learning
+import image_utils
+import learning
 
 
 flags = tf.app.flags
@@ -89,7 +89,7 @@ def main(unused_argv):
               # layers are already too deep in the network to be useful for
               # style and b) they're quite expensive to store.
               final_endpoint='pool5')
-          for name, matrix in style_end_points.iteritems():
+          for name, matrix in style_end_points.items():
             feature[name] = _float_feature(matrix.flatten().tolist())
 
       example = tf.train.Example(features=tf.train.Features(feature=feature))

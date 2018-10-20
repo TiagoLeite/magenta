@@ -20,14 +20,14 @@ from __future__ import print_function
 import io
 import os
 import tempfile
-
+import imageio
 
 import numpy as np
 import scipy
 import scipy.misc
 import tensorflow as tf
 
-from magenta.models.image_stylization import imagenet_data
+import imagenet_data
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import random_ops
 
@@ -406,7 +406,8 @@ def load_np_image_uint8(image_file):
   with tempfile.NamedTemporaryFile() as f:
     f.write(tf.gfile.GFile(image_file, 'rb').read())
     f.flush()
-    image = scipy.misc.imread(f.name)
+    # image = scipy.misc.imread(f.name)
+    image = imageio.imread(f.name)
     # Workaround for black-and-white images
     if image.ndim == 2:
       image = np.tile(image[:, :, None], (1, 1, 3))

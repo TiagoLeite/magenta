@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from magenta.models.image_stylization import vgg
+import vgg
 
 slim = tf.contrib.slim
 
@@ -42,7 +42,7 @@ def precompute_gram_matrices(image, final_endpoint='fc8'):
     tf.train.Saver(slim.get_variables('vgg_16')).restore(
         session, vgg.checkpoint_file())
     return dict([(key, gram_matrix(value).eval())
-                 for key, value in end_points.iteritems()])
+                 for key, value in end_points.items()])
 
 
 def total_loss(inputs, stylized_inputs, style_gram_matrices, content_weights,
@@ -108,7 +108,7 @@ def content_loss(end_points, stylized_end_points, content_weights):
   total_content_loss = np.float32(0.0)
   content_loss_dict = {}
 
-  for name, weight in content_weights.iteritems():
+  for name, weight in content_weights.items():
     # Reducing over all but the batch axis before multiplying with the content
     # weights allows to use multiple sets of content weights in a single batch.
     loss = tf.reduce_mean(
@@ -144,7 +144,7 @@ def style_loss(style_gram_matrices, end_points, style_weights):
   total_style_loss = np.float32(0.0)
   style_loss_dict = {}
 
-  for name, weight in style_weights.iteritems():
+  for name, weight in style_weights.items():
     # Reducing over all but the batch axis before multiplying with the style
     # weights allows to use multiple sets of style weights in a single batch.
     loss = tf.reduce_mean(

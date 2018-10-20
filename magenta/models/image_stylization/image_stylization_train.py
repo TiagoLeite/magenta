@@ -23,10 +23,10 @@ import os
 # internal imports
 import tensorflow as tf
 
-from magenta.models.image_stylization import image_utils
-from magenta.models.image_stylization import learning
-from magenta.models.image_stylization import model
-from magenta.models.image_stylization import vgg
+import image_utils
+import learning
+import model
+import vgg
 
 slim = tf.contrib.slim
 
@@ -65,84 +65,85 @@ FLAGS = flags.FLAGS
 
 
 def main(unused_argv=None):
-  with tf.Graph().as_default():
-    # Force all input processing onto CPU in order to reserve the GPU for the
-    # forward inference and back-propagation.
-    device = '/cpu:0' if not FLAGS.ps_tasks else '/job:worker/cpu:0'
-    with tf.device(tf.train.replica_device_setter(FLAGS.ps_tasks,
-                                                  worker_device=device)):
-      inputs, _ = image_utils.imagenet_inputs(FLAGS.batch_size,
-                                              FLAGS.image_size)
-      # Load style images and select one at random (for each graph execution, a
-      # new random selection occurs)
-      _, style_labels, style_gram_matrices = image_utils.style_image_inputs(
-          os.path.expanduser(FLAGS.style_dataset_file),
-          batch_size=FLAGS.batch_size, image_size=FLAGS.image_size,
-          square_crop=True, shuffle=True)
+    with tf.Graph().as_default():
+        # Force all input processing onto CPU in order to reserve the GPU for the
+        # forward inference and back-propagation.
+        device = '/cpu:0' if not FLAGS.ps_tasks else '/job:worker/cpu:0'
+        with tf.device(tf.train.replica_device_setter(FLAGS.ps_tasks,
+                                                      worker_device=device)):
+            inputs, _ = image_utils.imagenet_inputs(FLAGS.batch_size,
+                                                    FLAGS.image_size)
+            # Load style images and select one at random (for each graph execution, a
+            # new random selection occurs)
+            _, style_labels, style_gram_matrices = image_utils.style_image_inputs(
+                os.path.expanduser(FLAGS.style_dataset_file),
+                batch_size=FLAGS.batch_size, image_size=FLAGS.image_size,
+                square_crop=True, shuffle=True)
 
-    with tf.device(tf.train.replica_device_setter(FLAGS.ps_tasks)):
-      # Process style and weight flags
-      num_styles = FLAGS.num_styles
-      if FLAGS.style_coefficients is None:
-        style_coefficients = [1.0 for _ in range(num_styles)]
-      else:
-        style_coefficients = ast.literal_eval(FLAGS.style_coefficients)
-      if len(style_coefficients) != num_styles:
-        raise ValueError(
-            'number of style coefficients differs from number of styles')
-      content_weights = ast.literal_eval(FLAGS.content_weights)
-      style_weights = ast.literal_eval(FLAGS.style_weights)
+        with tf.device(tf.train.replica_device_setter(FLAGS.ps_tasks)):
+            # Process style and weight flags
+            num_styles = FLAGS.num_styles
+            if FLAGS.style_coefficients is None:
+                style_coefficients = [1.0 for _ in range(num_styles)]
+            else:
+                style_coefficients = ast.literal_eval(FLAGS.style_coefficients)
+            if len(style_coefficients) != num_styles:
+                raise ValueError(
+                    'number of style coefficients differs from number of styles')
+            content_weights = ast.literal_eval(FLAGS.content_weights)
+            style_weights = ast.literal_eval(FLAGS.style_weights)
 
-      # Rescale style weights dynamically based on the current style image
-      style_coefficient = tf.gather(
-          tf.constant(style_coefficients), style_labels)
-      style_weights = dict([(key, style_coefficient * value)
-                            for key, value in style_weights.iteritems()])
+            # Rescale style weights dynamically based on the current style image
+            style_coefficient = tf.gather(
+                tf.constant(style_coefficients), style_labels)
+            style_weights = dict([(key, style_coefficient * value)
+                                  for key, value in style_weights.items()])
 
-      # Define the model
-      stylized_inputs = model.transform(
-          inputs,
-          normalizer_params={
-              'labels': style_labels,
-              'num_categories': num_styles,
-              'center': True,
-              'scale': True})
+            # Define the model
+            stylized_inputs = model.transform(
+                inputs,
+                normalizer_params={
+                    'labels': style_labels,
+                    'num_categories': num_styles,
+                    'center': True,
+                    'scale': True})
 
-      # Compute losses.
-      total_loss, loss_dict = learning.total_loss(
-          inputs, stylized_inputs, style_gram_matrices, content_weights,
-          style_weights)
-      for key, value in loss_dict.iteritems():
-        tf.summary.scalar(key, value)
+            # Compute losses.
+            total_loss, loss_dict = learning.total_loss(
+                inputs, stylized_inputs, style_gram_matrices, content_weights,
+                style_weights)
+            for key, value in loss_dict.items():
+                tf.summary.scalar(key, value)
 
-      # Set up training
-      optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
-      train_op = slim.learning.create_train_op(
-          total_loss, optimizer, clip_gradient_norm=FLAGS.clip_gradient_norm,
-          summarize_gradients=False)
+            # Set up training
+            optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
+            train_op = slim.learning.create_train_op(
+                total_loss, optimizer, clip_gradient_norm=FLAGS.clip_gradient_norm,
+                summarize_gradients=False)
 
-      # Function to restore VGG16 parameters
-      # TODO(iansimon): This is ugly, but assign_from_checkpoint_fn doesn't
-      # exist yet.
-      saver = tf.train.Saver(slim.get_variables('vgg_16'))
-      def init_fn(session):
-        saver.restore(session, vgg.checkpoint_file())
+            # Function to restore VGG16 parameters
+            # TODO(iansimon): This is ugly, but assign_from_checkpoint_fn doesn't
+            # exist yet.
+            saver = tf.train.Saver(slim.get_variables('vgg_16'))
 
-      # Run training
-      slim.learning.train(
-          train_op=train_op,
-          logdir=os.path.expanduser(FLAGS.train_dir),
-          master=FLAGS.master,
-          is_chief=FLAGS.task == 0,
-          number_of_steps=FLAGS.train_steps,
-          init_fn=init_fn,
-          save_summaries_secs=FLAGS.save_summaries_secs,
-          save_interval_secs=FLAGS.save_interval_secs)
+            def init_fn(session):
+                saver.restore(session, vgg.checkpoint_file())
+
+            # Run training
+            slim.learning.train(
+                train_op=train_op,
+                logdir=os.path.expanduser(FLAGS.train_dir),
+                master=FLAGS.master,
+                is_chief=FLAGS.task == 0,
+                number_of_steps=FLAGS.train_steps,
+                init_fn=init_fn,
+                save_summaries_secs=FLAGS.save_summaries_secs,
+                save_interval_secs=FLAGS.save_interval_secs)
 
 
 def console_entry_point():
-  tf.app.run(main)
+    tf.app.run(main)
 
 
 if __name__ == '__main__':
-  console_entry_point()
+    console_entry_point()
