@@ -3,3 +3,8 @@ python3 build_image_data.py  --train_directory=train_images --output_directory=o
 !python3 image_stylization_train.py --train_dir=train_checks --num_styles=1 --style_dataset_file=outs --imagenet_data_dir=output/
 
 python3 image_stylization_create_dataset.py --style_files=styles/* --output_file=styleRecord
+
+python3 -m tensorflow.python.tools.optimize_for_inference   --input=frozen_model.pb   --output=optimized_graph.pb   --input_names="batch_processing/batch_join/n,batch_processing/batch_join,batch_processing/batch_join/fi
+fo_queue"   --output_names="transformer/expand/conv3/conv/Sigmoid"
+
+python3 freeze_graph.py  --model_dir=saved_net --output_node_names=transformer/expand/conv3/conv/Sigmoid
