@@ -1,0 +1,5 @@
+ python3 build_image_data.py  --train_directory=train_images --output_directory=output --labels_file=labels.txt --validation_directory=train_images/
+
+!python3 image_stylization_train.py --train_dir=train_checks --num_styles=1 --style_dataset_file=outs --imagenet_data_dir=output/
+
+python3 image_stylization_create_dataset.py --style_files=styles/* --output_file=styleRecord
